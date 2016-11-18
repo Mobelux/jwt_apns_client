@@ -25,14 +25,14 @@ class Alert(object):
     """
 
     def __init__(self, *args, **kwargs):
-        self.title = kwargs.get('title', None)
-        self.body = kwargs.get('body', None)
-        self.title_loc_key = kwargs.get('title_loc_key', None)
-        self.title_loc_args = kwargs.get('title_loc_args', None)
-        self.action_loc_key = kwargs.get('action_loc_key', None)
-        self.loc_key = kwargs.get('loc_key', None)
-        self.loc_args = kwargs.get('loc_args', None)
-        self.launch_image = kwargs.get('launch_image', None)
+        self.title = kwargs.pop('title', None)
+        self.body = kwargs.pop('body', None)
+        self.title_loc_key = kwargs.pop('title_loc_key', None)
+        self.title_loc_args = kwargs.pop('title_loc_args', None)
+        self.action_loc_key = kwargs.pop('action_loc_key', None)
+        self.loc_key = kwargs.pop('loc_key', None)
+        self.loc_args = kwargs.pop('loc_args', None)
+        self.launch_image = kwargs.pop('launch_image', None)
         super(Alert, self).__init__(*args, **kwargs)
 
     def get_payload_dict(self):
@@ -58,21 +58,21 @@ class APNSConnection(object):
             :param apns_key_path: (str) Path to file with the apns auth key
             :param api_version: (int) The API version.  Default is 3
             :param topic: (str) The APNs topic
-            :param environment: (str) development or production. Default is production.
+            :param environment: (str) development or production. Default is development.
             :param api_host: (str) The host for the API.  If not specified then defaults to the standard host for
                 the specified environment.
             :param api_port: (int) The port to make the http2 connection on.  Default is 443.
         """
-        self.algorithm = kwargs.get('algorithm', ALGORITHM)
-        self.team_id = kwargs.get('team_id')
-        self.apns_key_id = kwargs.get('apns_key_id')
-        self.apns_key_path = kwargs.get('apns_key_path')
-        self.api_version = kwargs.get(api_version, 3)
+        self.algorithm = kwargs.pop('algorithm', ALGORITHM)
+        self.team_id = kwargs.pop('team_id', None)
+        self.apns_key_id = kwargs.pop('apns_key_id', None)
+        self.apns_key_path = kwargs.pop('apns_key_path', None)
+        self.api_version = kwargs.pop('api_version', 3)
         self.secret = self.get_secret()
-        self.environment = kwargs.get('environment', 'production')
-        self.api_host = kwargs.get('api_host',
+        self.environment = kwargs.pop('environment', APNSEnvironments.DEV)
+        self.api_host = kwargs.pop('api_host',
                                    PROD_API_HOST if self.environment == APNSEnvironments.PROD else DEV_API_HOST)
-        self.api_port = kwargs.get('api_port', 443)
+        self.api_port = kwargs.pop('api_port', 443)
         self._conn = None
         super(APNSConnection, self).__init__(*args, **kwargs)
 
@@ -120,8 +120,8 @@ class APNSConnection(object):
 
     def get_request_headers(self, token=None, topic=None, priority=10, expiration=0):
         """
-        See https://developer.apple.com/library/content/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/CommunicatingwithAPNs.html#//apple_ref/doc/uid/TP40008194-CH11-SW1
-        for details on topic, expiration, and priority values.
+        See details on topic, expiration, priority values, etc. at
+        https://developer.apple.com/library/content/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/CommunicatingwithAPNs.html#//apple_ref/doc/uid/TP40008194-CH11-SW1
 
         :param token: the jwt token
         :param topic: the message topic
@@ -141,6 +141,8 @@ class APNSConnection(object):
             'apns-topic': topic,
             'authorization': 'bearer %s' % token.decode('ascii')
         }
+
+        return request_headers
 
     def get_request_payload(self, alert=None, badge=None, sound=None, content=None, category=None, thread=None):
         """
@@ -222,6 +224,9 @@ class APNSConnection(object):
         headers = self.get_request_headers()
         payload = self.get_request_payload(**kwargs)
         path = u'/%d/device/%s' % (self.api_version, device_registration_id)
+
+        # TODO: what if the connection has timed out?  Should this automatically create a new one?  Probably.
+        # Can that be detected in self.connection ?
         conn = self.connection
         conn.request(
             'POST',
@@ -238,6 +243,7 @@ class APNSConnection(object):
             reason = data_dict.get('reason', '')
         notification_response = NotificationResponse(status=status, reason=reason, host=conn.host, port=conn.port,
                                                      path=path, payload=payload, headers=headers)
+        return notification_response
 
 
 class NotificationResponse(object):
