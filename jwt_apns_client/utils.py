@@ -6,6 +6,7 @@ General utility classes and functions
 """
 from __future__ import absolute_import, unicode_literals, print_function, division
 
+
 class APNSReasons(object):
     """
     Constants for the various reason strings returned by APNs on error.

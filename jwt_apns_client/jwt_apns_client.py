@@ -71,6 +71,7 @@ class APNSConnection(object):
             :param api_port: (int) The port to make the http2 connection on.  Default is 443.
         """
         self.algorithm = kwargs.pop('algorithm', ALGORITHM)
+        self.topic = kwargs.pop('topic', None)
         self.team_id = kwargs.pop('team_id', None)
         self.apns_key_id = kwargs.pop('apns_key_id', None)
         self.apns_key_path = kwargs.pop('apns_key_path', None)
@@ -143,9 +144,9 @@ class APNSConnection(object):
             token = self.get_request_token()
 
         request_headers = {
-            'apns-expiration': expiration,
-            'apns-priority': priority,
-            'apns-topic': topic,
+            'apns-expiration': u'%s' % expiration,
+            'apns-priority': u'%s' % priority,
+            'apns-topic': u'%s' % topic,
             'authorization': 'bearer %s' % token.decode('ascii')
         }
 

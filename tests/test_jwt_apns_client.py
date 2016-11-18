@@ -166,7 +166,14 @@ class APNSConnectionTest(unittest.TestCase):
         self.assertEqual('', connection.secret)
         self.assertEqual(None, connection._conn)
 
-    def test_send_notification(self):
+    def test_send_notification_good(self):
+        pass
+
+    def test_send_notification_with_idle_timeout(self):
+        pass
+
+    def test_send_notification_with_error(self):
+        response = {"reason": "BadDeviceToken"}
         pass
 
     def test_get_token_headers(self):
