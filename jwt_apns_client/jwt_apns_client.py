@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+"""
+jwt_apns_client/jwt_apns_client
+
+Client for handling HTTP/2 and JWT based connections to Apple's APNs.
+"""
 from __future__ import unicode_literals, absolute_import, print_function, division
 
 import json
@@ -6,6 +11,8 @@ import jwt
 import time
 
 from hyper import HTTPConnection
+
+from .utils import APNSReasons
 
 ALGORITHM = 'ES256'
 PROD_API_HOST = 'api.push.apple.com'
@@ -225,8 +232,6 @@ class APNSConnection(object):
         payload = self.get_request_payload(**kwargs)
         path = u'/%d/device/%s' % (self.api_version, device_registration_id)
 
-        # TODO: what if the connection has timed out?  Should this automatically create a new one?  Probably.
-        # Can that be detected in self.connection ?
         conn = self.connection
         conn.request(
             'POST',
@@ -241,9 +246,22 @@ class APNSConnection(object):
         if not status == 200:
             data_dict = json.loads(data)
             reason = data_dict.get('reason', '')
+
         notification_response = NotificationResponse(status=status, reason=reason, host=conn.host, port=conn.port,
                                                      path=path, payload=payload, headers=headers)
+
+        if reason == APNSReasons.IDLE_TIMEOUT:
+            self.close()
+
         return notification_response
+
+    def close(self, error_code=None):
+        """
+        Close the HTTP/2 connection with optional error code
+        """
+        if self._conn:
+            self._conn.close(error_code=error_code)
+        self._conn = None
 
 
 class NotificationResponse(object):
