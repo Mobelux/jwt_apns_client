@@ -7,12 +7,11 @@ Client for handling HTTP/2 and JWT based connections to Apple's APNs.
 from __future__ import unicode_literals, absolute_import, print_function, division
 
 import json
-import jwt
 import time
 
 from hyper import HTTPConnection
 
-from .utils import APNSReasons
+from .utils import APNSReasons, make_provider_token
 
 ALGORITHM = 'ES256'
 PROD_API_HOST = 'api.push.apple.com'
@@ -69,6 +68,7 @@ class APNSConnection(object):
             :param api_host: (str) The host for the API.  If not specified then defaults to the standard host for
                 the specified environment.
             :param api_port: (int) The port to make the http2 connection on.  Default is 443.
+            :param provider_token: (str) The base64 encoded jwt provider token
         """
         self.algorithm = kwargs.pop('algorithm', ALGORITHM)
         self.topic = kwargs.pop('topic', None)
@@ -81,6 +81,11 @@ class APNSConnection(object):
         self.api_host = kwargs.pop('api_host',
                                    PROD_API_HOST if self.environment == APNSEnvironments.PROD else DEV_API_HOST)
         self.api_port = kwargs.pop('api_port', 443)
+        self.provider_token = kwargs.pop('provider_token', None)
+
+        if not self.provider_token and self.apns_key_id and self.team_id:
+            self.provider_token = self.make_provider_token()
+
         self._conn = None
         super(APNSConnection, self).__init__(*args, **kwargs)
 
@@ -141,7 +146,7 @@ class APNSConnection(object):
             topic = self.topic
 
         if token is None:
-            token = self.get_request_token()
+            token = self.provider_token
 
         request_headers = {
             'apns-expiration': u'%s' % expiration,
@@ -167,9 +172,12 @@ class APNSConnection(object):
         data = self.get_payload_data(alert, badge, sound, content, category, thread)
         return json.dumps(data).encode('utf-8')
 
-    def get_request_token(self, issuer=None, issued_at=None, algorithm=None, secret=None, headers=None):
+    def make_provider_token(self, issuer=None, issued_at=None, algorithm=None, secret=None, headers=None):
         """
-        Gets the jwt token for the request
+        Build the jwt token for the connection.
+
+        Apple returns an error if the provider token is updated too often, so we don't want to constantly build
+        new ones.
 
         :returns: JWT encoded token
         """
@@ -179,16 +187,7 @@ class APNSConnection(object):
         secret = secret or self.secret
         headers = headers or self.get_token_headers(algorithm=algorithm)
 
-        token = jwt.encode(
-            {
-                'iss': issuer,
-                'iat': issued_at
-            },
-            secret,
-            algorithm=algorithm,
-            headers=headers
-        )
-        return token
+        return make_provider_token(issuer=issuer, issued_at=issued_at, secret=secret, headers=headers)
 
     def get_secret(self):
         secret = ''
