@@ -76,7 +76,7 @@ def make_provider_token(issuer, secret, issued_at=None, headers=None):
     :param issued_at: Time as unix epoch the token was issued at.  Defaults to time.time().
     :param headers: The jwt headers to use as a dict.  Includes the algorithm and key id.
     :param algorithm: The hashing algorithm used.  Should be the same as used in the headers.  If not specified
-        then the value will be taken from `headers['algorithm']`
+        then the value will be taken from `headers['alg']`
     :returns: JWT encoded token
     """
     issued_at = issued_at or time.time()
