@@ -15,14 +15,17 @@ import sys
 import unittest
 from contextlib import contextmanager
 from click.testing import CliRunner
+from hyper.http20.response import HTTP20Response
+import time
+import jwt
 
 try:
     from unittest import mock
 except ImportError:
     import mock
 
-from jwt_apns_client import jwt_apns_client
-from jwt_apns_client import cli
+from jwt_apns_client import jwt_apns_client, cli
+from jwt_apns_client.utils import APNSReasons
 
 
 class TestJwt_apns_client(unittest.TestCase):
@@ -128,7 +131,9 @@ class APNSConnectionTest(unittest.TestCase):
 
         expected_secret = (
             '-----BEGIN PRIVATE KEY-----\n'
-            'INVALID_FAKE_KEY\n'
+            'MIGEAgEAMBAGByqGSM49AgEGBSuBBAAKBG0wawIBAQQg2yIXGwM2PGlbigymjZvd\n'
+            'ouICGOKxRRiT3I4rOxaCTXuhRANCAASYKQIMh0jBbQ5MmzwldwnNTQPtbeOfFrf5\n'
+            'NzrljP9ZBHJhjfe0O1wRnOzGDbpJuMQrZFppIEnaXZ5/0Q+wpPIt\n'
             '-----END PRIVATE KEY-----\n'
         )
         connection = jwt_apns_client.APNSConnection(algorithm='HS256',
@@ -166,24 +171,114 @@ class APNSConnectionTest(unittest.TestCase):
         self.assertEqual('', connection.secret)
         self.assertEqual(None, connection._conn)
 
-    def test_send_notification_good(self):
-        pass
+    @mock.patch('jwt_apns_client.jwt_apns_client.HTTPConnection')
+    def test_send_notification_good(self, HTTPConnectionMock):
+        HTTPConnectionMock.return_value.get_response.return_value = make_http_response_mock()
+        connection = jwt_apns_client.APNSConnection(
+            team_id='TEAMID',
+            apns_key_id='KEYID',
+            apns_key_path=self.KEY_FILE_PATH)
+        response = connection.send_notification(device_registration_id='asdf12345', alert='Testing')
+        self.assertTrue(isinstance(response, jwt_apns_client.NotificationResponse))
+        self.assertEqual(1, HTTPConnectionMock.call_count)
 
-    def test_send_notification_with_idle_timeout(self):
-        pass
+    @mock.patch('jwt_apns_client.jwt_apns_client.HTTPConnection')
+    def test_send_notification_with_idle_timeout(self, HTTPConnectionMock):
+        """
+        Test that when an idle timeout error is received the connection is cleared/reset
+        """
+        response_mock = make_http_response_mock(status=400, reason=APNSReasons.IDLE_TIMEOUT)
+        HTTPConnectionMock.return_value.get_response.return_value = response_mock
 
-    def test_send_notification_with_error(self):
-        response = {"reason": "BadDeviceToken"}
-        pass
+        connection = jwt_apns_client.APNSConnection(
+            team_id='TEAMID',
+            apns_key_id='KEYID',
+            apns_key_path=self.KEY_FILE_PATH)
+        response = connection.send_notification(device_registration_id='asdf12345', alert='Testing')
+        self.assertTrue(isinstance(response, jwt_apns_client.NotificationResponse))
+        self.assertEqual(400, response.status)
+        self.assertEqual(APNSReasons.IDLE_TIMEOUT, response.reason)
+        self.assertIsNone(connection._conn)  # old connection was cleared.
 
-    def test_get_token_headers(self):
-        pass
+
+    @mock.patch('jwt_apns_client.jwt_apns_client.HTTPConnection')
+    def test_send_notification_with_error(self, HTTPConnectionMock):
+        response_mock = make_http_response_mock(status=400, reason=APNSReasons.MISSING_DEVICE_TOKEN)
+        HTTPConnectionMock.return_value.get_response.return_value = response_mock
+        connection = jwt_apns_client.APNSConnection(
+            team_id='TEAMID',
+            apns_key_id='KEYID',
+            apns_key_path=self.KEY_FILE_PATH)
+        http2conn = connection.connection
+        response = connection.send_notification(device_registration_id='asdf12345', alert='Testing')
+        self.assertTrue(isinstance(response, jwt_apns_client.NotificationResponse))
+        self.assertEqual(400, response.status)
+        self.assertEqual(APNSReasons.MISSING_DEVICE_TOKEN, response.reason)
+        self.assertIsNotNone(connection._conn)  # old connection was not cleared.
+
+    def test_get_token_headers_returns_dict_with_correct_keys(self):
+        connection = jwt_apns_client.APNSConnection(
+            team_id='TEAMID',
+            apns_key_id='KEYID',
+            apns_key_path=self.KEY_FILE_PATH)
+
+        self.assertEqual({'alg': 'ES256', 'kid': 'KEYID'}, connection.get_token_headers())
 
     def test_get_secret(self):
-        pass
+        expected_secret = (
+            '-----BEGIN PRIVATE KEY-----\n'
+            'MIGEAgEAMBAGByqGSM49AgEGBSuBBAAKBG0wawIBAQQg2yIXGwM2PGlbigymjZvd\n'
+            'ouICGOKxRRiT3I4rOxaCTXuhRANCAASYKQIMh0jBbQ5MmzwldwnNTQPtbeOfFrf5\n'
+            'NzrljP9ZBHJhjfe0O1wRnOzGDbpJuMQrZFppIEnaXZ5/0Q+wpPIt\n'
+            '-----END PRIVATE KEY-----\n'
+        )
+        connection = jwt_apns_client.APNSConnection(
+            team_id='TEAMID',
+            apns_key_id='KEYID',
+            apns_key_path=self.KEY_FILE_PATH)
 
-    def test_get_request_token(self):
-        pass
+        self.assertEqual(expected_secret, connection.get_secret())
+
+    def test_make_provider_token_calls_jwt_encode_with_correct_args(self):
+        """
+        Test that APNSConnection.make_provider_token() calls jwt.encode() with the correct
+        arguments.  jwt.encode() returns different results each time even with the same data passed in
+        so we cannot just test for the expected return value.
+        """
+        issued_at = time.time()
+        connection = jwt_apns_client.APNSConnection(
+            team_id='TEAMID',
+            apns_key_id='KEYID',
+            apns_key_path=self.KEY_FILE_PATH)
+
+        with mock.patch('jwt_apns_client.utils.jwt.encode') as mock_encode:
+            connection.make_provider_token(issued_at=issued_at)
+            mock_encode.assert_called_with(
+                {
+                    'iss': connection.team_id,
+                    'iat': issued_at
+                },
+                connection.secret,
+                algorithm=connection.algorithm,
+                headers=connection.get_token_headers())
+
+    def test_make_provider_token_encodes_correctly(self):
+        """
+        Run the token returned by make_provider_token back through jwt.decode() and verify that the expected
+        payload is there.
+        """
+        issued_at = time.time()
+        connection = jwt_apns_client.APNSConnection(
+            team_id='TEAMID',
+            apns_key_id='KEYID',
+            apns_key_path=self.KEY_FILE_PATH)
+        token = connection.make_provider_token(issued_at=issued_at)
+        decoded = jwt.decode(token,
+                             connection.secret,
+                             algorithm=connection.algorithm,
+                             headers=connection.get_token_headers(),
+                             verify=False)
+        self.assertEqual(decoded, {'iat': issued_at, 'iss': 'TEAMID'})
 
     def test_get_request_payload(self):
         pass
@@ -206,3 +301,14 @@ class APNSConnectionTest(unittest.TestCase):
         creating a new one
         """
         pass
+
+
+def make_http_response_mock(status=200, reason=''):
+    HTTP20ResponseMock = mock.MagicMock(spec=HTTP20Response)
+    if reason:
+        HTTP20ResponseMock.return_value.read = mock.Mock(return_value='{"reason": "%s"}' % reason)
+    else:
+        HTTP20ResponseMock.return_value.read = mock.Mock(return_value='')
+    HTTP20ResponseMock.return_value.status = status
+
+    return HTTP20ResponseMock()
