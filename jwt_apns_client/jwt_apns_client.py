@@ -20,6 +20,9 @@ API_PORT = '443'
 
 
 class APNSEnvironments(object):
+    """
+    Class to act as enum of APNs Environments
+    """
     PROD = 'prod'
     DEV = 'dev'
 
@@ -28,6 +31,18 @@ class Alert(object):
     """
     An APNs Alert.  APNs Payloads can take a dict, which will be built from this object
     or just a single string.
+
+    More information on the data may be found in Apple's documentation at
+    https://developer.apple.com/library/content/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/PayloadKeyReference.html
+
+    :ivar str title: The alert title
+    :ivar str body: The alert body
+    :ivar str title_loc_key: Localizable string for the title
+    :ivar [str] title_loc_args: Variable string values to appear in place for format specifiers in title_loc_key
+    :ivar str action_loc_key: String to get localized title for the View button in the app.
+    :ivar str loc_key: Key to an alert-message string in app's Localizable.strings.
+    :ivar [str] loc_args: Variable string values for format specifiers in loc_key
+    :ivar str launch_image: Filename of an image in the app bundle to be used as a launch image.
     """
 
     def __init__(self, *args, **kwargs):
@@ -42,6 +57,10 @@ class Alert(object):
         super(Alert, self).__init__(*args, **kwargs)
 
     def get_payload_dict(self):
+        """
+        Returns the APNs payload data from the object instance as a dictionary suitable for encoding
+        as JSON for use in API requests.
+        """
         payload = {}
         props = ['title', 'body', 'title_loc_key', 'title_loc_args', 'action_loc_key', 'loc_key', 'loc_args',
                  'launch_image']
@@ -54,21 +73,35 @@ class Alert(object):
 
 
 class APNSConnection(object):
+    """
+    Manages a connection to APNs
 
+    :ivar str algorithm: The algorithm to use for the jwt.  Defaults to ES256.
+    :ivar str team_id: The app team id
+    :ivar str apns_key_id: The apns key id
+    :ivar str apns_key_path: Path to file with the apns auth key
+    :ivar int api_version: The API version.  Default is 3
+    :ivar str topic: The APNs topic
+    :ivar str environment: development or production. Default is development.
+    :ivar str api_host: The host for the API.  If not specified then defaults to the standard host for
+        the specified environment.
+    :ivar int api_port: The port to make the http2 connection on.  Default is 443.
+    :ivar str provider_token: The base64 encoded jwt provider token
+    """
     def __init__(self, *args, **kwargs):
         """
         params:
-            :param algorithm: (str) The algorithm to use for the jwt.  Defaults to ES256.
-            :param team_id: (str) The app team id
-            :param apns_key_id: (str) The apns key id
-            :param apns_key_path: (str) Path to file with the apns auth key
-            :param api_version: (int) The API version.  Default is 3
-            :param topic: (str) The APNs topic
-            :param environment: (str) development or production. Default is development.
-            :param api_host: (str) The host for the API.  If not specified then defaults to the standard host for
+            :param str algorithm: The algorithm to use for the jwt.  Defaults to ES256.
+            :param str team_id: The app team id
+            :param str apns_key_id: The apns key id
+            :param str apns_key_path: Path to file with the apns auth key
+            :param int api_version: The API version.  Default is 3
+            :param str topic: The APNs topic
+            :param str environment: development or production. Default is development.
+            :param str api_host: The host for the API.  If not specified then defaults to the standard host for
                 the specified environment.
-            :param api_port: (int) The port to make the http2 connection on.  Default is 443.
-            :param provider_token: (str) The base64 encoded jwt provider token
+            :param int api_port: The port to make the http2 connection on.  Default is 443.
+            :param str provider_token: The base64 encoded jwt provider token
         """
         self.algorithm = kwargs.pop('algorithm', ALGORITHM)
         self.topic = kwargs.pop('topic', None)
@@ -99,12 +132,16 @@ class APNSConnection(object):
         """
         Builds the payload dict.
 
+        More information about these values may be found in Apple's documentation at
+        https://developer.apple.com/library/content/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/PayloadKeyReference.html
+
         :param alert: May be a `Alert` instance or a string
-        :param badge:
-        :param sound:
-        :param content:
-        :param category:
-        :param thread:
+        :param int badge: Include to modify the badge of the app's icon
+        :param str sound: The name of a sound in the app's bundle or Librar/Sounds folder.
+        :param int content: Set to 1 for a silent notification.
+        :param str category: String which represents the notification's type.  This should correspond
+            with a value in the `identifier` property of one of the app's registered categories.
+        :param str thread: An app specific identifier for grouping notifications.
 
         :returns: The payload as a dict ready for conversion to json in a request.
         """
@@ -161,12 +198,16 @@ class APNSConnection(object):
         """
         Returns the request payload as utf-8 encoded json
 
+        More information about these values may be found in Apple's documentation at
+        https://developer.apple.com/library/content/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/PayloadKeyReference.html
+
         :param alert: May be a `Alert` instance or a string
-        :param badge:
-        :param sound:
-        :param content:
-        :param category:
-        :param thread:
+        :param int badge: Include to modify the badge of the app's icon
+        :param str sound: The name of a sound in the app's bundle or Librar/Sounds folder.
+        :param int content: Set to 1 for a silent notification.
+        :param str category: String which represents the notification's type.  This should correspond
+            with a value in the `identifier` property of one of the app's registered categories.
+        :param str thread: An app specific identifier for grouping notifications.
         :returns: The JSON encoded request payload
         """
         data = self.get_payload_data(alert, badge, sound, content, category, thread)
@@ -179,6 +220,11 @@ class APNSConnection(object):
         Apple returns an error if the provider token is updated too often, so we don't want to constantly build
         new ones.
 
+        :param str issuer: JWT issuer.  Generally the team id.  Defaults to self.team_id
+        :param time.time issued_at: A time object specifying when the token was issued. Defaults to time.time()
+        :param str algorithm: The algorithm to use for the jwt.  Defaults to ES256, which is required by the APNs.
+        :param str secret: The APNs key.  If None then defaults to self.secret.
+        :param dict headers: The JWT token headers
         :returns: JWT encoded token
         """
         issuer = issuer or self.team_id
@@ -200,6 +246,9 @@ class APNSConnection(object):
         """
         Build headers for the JWT token
 
+        :param str algorithm: The algorithm to use for the jwt.  Defaults to ES256, which is required by the APNs.
+        :param str apns_key_id: The apns key id
+
         :returns: Dict of headers for the JWT token
         """
         algorithm = algorithm or self.algorithm
@@ -217,13 +266,14 @@ class APNSConnection(object):
         Send a push notification using http2.  Creates a new connection or reuses an existing connection
         if possible.
 
-        :param device_registration_id: The registration id of the device to send the notification to
+        :param str device_registration_id: The registration id of the device to send the notification to
         :param alert: May be a `Alert` instance or a string
-        :param badge:
-        :param sound:
-        :param content:
-        :param category:
-        :param thread:
+        :param int badge: Include to modify the badge of the app's icon
+        :param str sound: The name of a sound in the app's bundle or Librar/Sounds folder.
+        :param int content: Set to 1 for a silent notification.
+        :param str category: String which represents the notification's type.  This should correspond
+            with a value in the `identifier` property of one of the app's registered categories.
+        :param str thread: An app specific identifier for grouping notifications.
         :returns: A :class:`jwt_apns_client.jwt_apns_client.NotificationResponse`
         """
         # TODO: Should we accept ALL params which the various chain of methods accept too allow for full
@@ -267,6 +317,14 @@ class APNSConnection(object):
 class NotificationResponse(object):
     """
     Encapsulate a response to sending a notification using the API.
+
+    :ivar int status: The HTTP status code of the response
+    :ivar str reason: Reason if specified
+    :ivar str payload: The JSON payload
+    :ivar dict headers: response headers
+    :ivar str host: Host the request was made to
+    :ivar int port: The port the request was made to
+    :ivar str path: Path of the HTTP request
     """
 
     def __init__(self, status=200, reason='', host='', port=443, path='', payload=None, headers=None, *args, **kwargs):
