@@ -1,3 +1,8 @@
+Click>=6.0
+cryptography>=1.5.3
+PyJWT>=1.4.2
+hyper>=0.7.0
+
 pip==8.1.2
 bumpversion==0.5.3
 wheel==0.29.0
