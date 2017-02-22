@@ -273,11 +273,18 @@ class APNSConnectionTest(unittest.TestCase):
             apns_key_id='KEYID',
             apns_key_path=self.KEY_FILE_PATH)
         token = connection.make_provider_token(issued_at=issued_at)
+        options = {
+            'verify_signature': False,
+            'verify_exp': False,
+            'verify_nbf': False,
+            'verify_iat': False,
+            'verify_aud': False
+        }
         decoded = jwt.decode(token,
                              connection.secret,
                              algorithm=connection.algorithm,
                              headers=connection.get_token_headers(),
-                             verify=False)
+                             options=options)
         self.assertEqual(decoded, {'iat': issued_at, 'iss': 'TEAMID'})
 
     def test_get_request_payload(self):

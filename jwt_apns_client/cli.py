@@ -5,6 +5,8 @@ import click
 
 from jwt_apns_client.jwt_apns_client import APNSConnection, APNSEnvironments
 
+click.disable_unicode_literals_warning = True
+
 
 @click.command()
 def main(args=None):
