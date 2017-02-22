@@ -13,10 +13,6 @@ JWT APNs Client
         :target: https://jwt-apns-client.readthedocs.io/en/latest/?badge=latest
         :alt: Documentation Status
 
-.. image:: https://pyup.io/repos/github/mobelux/jwt_apns_client/shield.svg
-     :target: https://pyup.io/repos/github/mobelux/jwt_apns_client/
-     :alt: Updates
-
 
 APNs client using JWT
 
@@ -37,4 +33,3 @@ This package was created with Cookiecutter_ and the `audreyr/cookiecutter-pypack
 
 .. _Cookiecutter: https://github.com/audreyr/cookiecutter
 .. _`audreyr/cookiecutter-pypackage`: https://github.com/audreyr/cookiecutter-pypackage
-
