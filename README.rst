@@ -6,8 +6,8 @@ JWT APNs Client
 .. image:: https://img.shields.io/pypi/v/jwt_apns_client.svg
         :target: https://pypi.python.org/pypi/jwt_apns_client
 
-.. image:: https://img.shields.io/travis/mobelux/jwt_apns_client.svg
-        :target: https://travis-ci.org/mobelux/jwt_apns_client
+.. image:: https://img.shields.io/travis/Mobelux/jwt_apns_client.svg
+        :target: https://travis-ci.org/Mobelux/jwt_apns_client
 
 .. image:: https://readthedocs.org/projects/jwt-apns-client/badge/?version=latest
         :target: https://jwt-apns-client.readthedocs.io/en/latest/?badge=latest
