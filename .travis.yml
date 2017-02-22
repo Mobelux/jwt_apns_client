@@ -8,7 +8,6 @@ env:
   - TOXENV=py35
   - TOXENV=py34
   - TOXENV=py27
-  - TOXENV=pypy
   - TOXENV=flake8
   - TOXENV=stats
 

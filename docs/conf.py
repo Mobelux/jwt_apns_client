@@ -56,7 +56,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'JWT APNs Client'
-copyright = u"2016, Justin Michalicek"
+copyright = u"2016, Mobelux LLC"
 
 # The version info for the project you're documenting, acts as replacement
 # for |version| and |release|, also used in various other places throughout
